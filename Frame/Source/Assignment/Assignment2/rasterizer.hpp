@@ -15,7 +15,8 @@ namespace rst
     enum class Buffers
     {
         Color = 1,
-        Depth = 2
+        //update：总感觉一开始的深度为2有很大影响。
+        Depth = 10000
     };
 
     inline Buffers operator|(Buffers a, Buffers b)

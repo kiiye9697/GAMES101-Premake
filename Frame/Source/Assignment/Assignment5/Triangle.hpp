@@ -4,14 +4,38 @@
 
 #include <cstring>
 
-bool rayTriangleIntersect(const Vector3f& v0, const Vector3f& v1, const Vector3f& v2, const Vector3f& orig,
-                          const Vector3f& dir, float& tnear, float& u, float& v)
+bool rayTriangleIntersect(const Vector3f& v0,
+                          const Vector3f& v1,
+                          const Vector3f& v2,
+                          const Vector3f& orig,
+                          const Vector3f& dir,
+                          float& tnear,
+                          float& u,
+                          float& v)
 {
-    // TODO: Implement this function that tests whether the triangle
-    // that's specified bt v0, v1 and v2 intersects with the ray (whose
-    // origin is *orig* and direction is *dir*)
-    // Also don't forget to update tnear, u and v.
-    return false;
+    const float eps = 1e-6f;               // ÈÝÈÌÎó²î
+
+    //two vector
+    Vector3f edge1 = v1 - v0;
+    Vector3f edge2 = v2 - v0;
+    Vector3f pvec =crossProduct(dir,edge2);
+    float det = dotProduct(edge1, pvec);
+    //upper function:using this way to get »ìºÏ»ý
+
+    //ensure the light coming from front place
+    if (det > -eps && det < eps)
+        return false;
+    float invDet = 1.0f / det;
+    Vector3f tvec = orig - v0;
+    u = dotProduct(tvec,pvec) * invDet;
+    if (u < 0.0f || u > 1.0f)
+        return false;
+    Vector3f qvec = crossProduct(tvec,edge1);
+    v = dotProduct(dir,qvec) * invDet;
+    if (v < 0.0f || u + v > 1.0f)
+        return false;
+    tnear = dotProduct(edge2,qvec) * invDet;
+    return tnear >= eps;
 }
 
 class MeshTriangle : public Object

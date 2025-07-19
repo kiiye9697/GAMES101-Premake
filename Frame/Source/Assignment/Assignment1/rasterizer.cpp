@@ -143,7 +143,7 @@ void rst::rasterizer::draw(rst::pos_buf_id pos_buffer, rst::ind_buf_id ind_buffe
 
     float f1 = (100 - 0.1) / 2.0;
     float f2 = (100 + 0.1) / 2.0;
-
+    //在这里我们可以发现mvp变换的使用地点。
     Eigen::Matrix4f mvp = projection * view * model;
     for (auto& i : ind)
     {

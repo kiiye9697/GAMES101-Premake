@@ -43,6 +43,28 @@ auto to_vec4(const Eigen::Vector3f& v3, float w = 1.0f)
 static bool insideTriangle(int x, int y, const Vector3f* _v)
 {   
     // TODO : Implement this function to check if the point (x, y) is inside the triangle represented by _v[0], _v[1], _v[2]
+    Eigen::Vector3f v0 = _v[0];
+    Eigen::Vector3f v1 = _v[1];
+    Eigen::Vector3f v2 = _v[2];
+
+    // 计算边向量
+    Eigen::Vector3f ab = v1 - v0;
+    Eigen::Vector3f bc = v2 - v1;
+    Eigen::Vector3f ca = v0 - v2;
+
+    // 计算点相对于顶点的位置向量
+    Eigen::Vector3f ap = Eigen::Vector3f(x - v0.x(), y - v0.y(), 0.0f);
+    Eigen::Vector3f bp = Eigen::Vector3f(x - v1.x(), y - v1.y(), 0.0f);
+    Eigen::Vector3f cp = Eigen::Vector3f(x - v2.x(), y - v2.y(), 0.0f);
+
+    // 计算叉乘
+    Eigen::Vector3f cross1 = ab.cross(ap);
+    Eigen::Vector3f cross2 = bc.cross(bp);
+    Eigen::Vector3f cross3 = ca.cross(cp);
+
+    // 检查叉乘结果的z分量的符号是否一致
+    return (cross1.z() >= 0 && cross2.z() >= 0 && cross3.z() >= 0) ||
+        (cross1.z() <= 0 && cross2.z() <= 0 && cross3.z() <= 0);
 }
 
 static std::tuple<float, float, float> computeBarycentric2D(float x, float y, const Vector3f* v)
@@ -105,7 +127,8 @@ void rst::rasterizer::draw(pos_buf_id pos_buffer, ind_buf_id ind_buffer, col_buf
 //Screen space rasterization
 void rst::rasterizer::rasterize_triangle(const Triangle& t) {
     auto v = t.toVector4();
-    
+
+    // Find out the bounding box of current triangle.
     // TODO : Find out the bounding box of current triangle.
     // iterate through the pixel and find if the current pixel is inside the triangle
 
@@ -116,7 +139,72 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t) {
     //z_interpolated *= w_reciprocal;
 
     // TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
+
+    //Step 1:calculate the start_point and the end_point.
+    //其中v是一个三维顶点，传入计算的时候被设定为一个齐次坐标。
+    float x_min = std::min({ v[0].x(), v[1].x(), v[2].x() });
+    float y_min = std::min({ v[0].y(), v[1].y(), v[2].y() });
+    float x_max = std::max({ v[0].x(), v[1].x(), v[2].x() });
+    float y_max = std::max({ v[0].y(), v[1].y(), v[2].y() });
+
+    int x_start = static_cast<int>(std::floor(x_min));
+    int y_start = static_cast<int>(std::floor(y_min));
+    int x_end = static_cast<int>(std::ceil(x_max));
+    int y_end = static_cast<int>(std::ceil(y_max));
+    //Step2：check each pixal in the bounding box to ensure if is inside.
+    for (int x = x_start; x < x_end; ++x)
+    {
+        for (int y = y_start; y < y_end; ++y) {
+            if (x < 0 || x >= width || y < 0 || y >= height) {
+                continue;
+            }
+
+            Eigen::Vector3f color_sum(0.0f, 0.0f, 0.0f);
+            float depth_sum = 0.0f;
+            int sample_count = 0;
+
+            // 对每个像素进行 2x2 采样，每个位置都保留原点位置左上，左下，右上，右下像素点再取平均值。
+            for (int sy = 0; sy < 2; ++sy) {
+                for (int sx = 0; sx < 2; ++sx) {
+                    float sub_x = x + (sx + 0.5f) / 2.0f;
+                    float sub_y = y + (sy + 0.5f) / 2.0f;
+
+                    if (!insideTriangle(static_cast<int>(sub_x), static_cast<int>(sub_y), t.v)) 
+                    {
+                        continue;
+                        //here，when oversampling，some place may out of it though the origin point is inside,which better the performance.
+                    }
+
+                    auto [alpha, beta, gamma] = computeBarycentric2D(sub_x, sub_y, t.v);
+                    float w_reciprocal = 1.0f / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                    float z_interpolated =
+                        alpha * v[0].z() / v[0].w() +
+                        beta * v[1].z() / v[1].w() +
+                        gamma * v[2].z() / v[2].w();
+                    z_interpolated *= w_reciprocal;
+
+                    color_sum += t.getColor();
+                    depth_sum += z_interpolated;
+                    sample_count++;
+                }
+            }
+
+            if (sample_count > 0) {
+                color_sum /= sample_count;
+                depth_sum /= sample_count;
+
+                int ind = get_index(x, y);
+                if (depth_sum<depth_buf[ind])
+                {
+                    depth_buf[ind] = depth_sum;
+                    Eigen::Vector3f point(x, y, depth_sum);
+                    set_pixel(point, color_sum);
+                }
+            }
+        }
+    }
 }
+
 
 void rst::rasterizer::set_model(const Eigen::Matrix4f& m)
 {

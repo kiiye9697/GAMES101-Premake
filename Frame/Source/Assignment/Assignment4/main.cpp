@@ -32,16 +32,51 @@ void naive_bezier(const std::vector<cv::Point2f> &points, cv::Mat &window)
 
 cv::Point2f recursive_bezier(const std::vector<cv::Point2f> &control_points, float t) 
 {
-    // TODO: Implement de Casteljau's algorithm
-    return cv::Point2f();
+    //Skip place
+    if (control_points.size() == 1) {
+        return control_points[0];
+    }
+    std::vector<cv::Point2f> new_control_points;
+    //still keep upload
+    for (size_t i = 0; i < control_points.size() - 1; ++i) {
+        //count each point from this logic
+        float x = (1 - t) * control_points[i].x + t * control_points[i + 1].x;
+        float y = (1 - t) * control_points[i].y + t * control_points[i + 1].y;
+        new_control_points.push_back(cv::Point2f(x, y));
+    }
 
+    // roll method
+    return recursive_bezier(new_control_points, t);
 }
 
-void bezier(const std::vector<cv::Point2f> &control_points, cv::Mat &window) 
-{
-    // TODO: Iterate through all t = 0 to t = 1 with small steps, and call de Casteljau's 
-    // recursive Bezier algorithm.
+void bezier(const std::vector<cv::Point2f>& control_points, cv::Mat& window) {
+    // 设置步长
+    for (float t = 0.0f; t <= 1.0f; t += 0.001f) {
+        // 使用de Casteljau算法计算曲线上的点
+        cv::Point2f point = recursive_bezier(control_points, t);
 
+        // 计算当前点的整数坐标
+        int x = static_cast<int>(point.x);
+        int y = static_cast<int>(point.y);
+
+        // 遍历当前点周围的 3x3 像素
+        for (int i = -1; i <= 1; ++i) {
+            for (int j = -1; j <= 1; ++j) {
+                int neighbor_x = x + j;
+                int neighbor_y = y + i;
+
+                // 检查是否在图像范围内
+                if (neighbor_x >= 0 && neighbor_x < window.cols && neighbor_y >= 0 && neighbor_y < window.rows) {
+                    // 计算与中心点的距离
+                    float distance = std::sqrt(std::pow(point.x - (neighbor_x + 0.5f), 2) + std::pow(point.y - (neighbor_y + 0.5f), 2));
+
+                    // 根据距离确定插值权重，使用线性插值，距离越近权重越高
+                    float weight = 1.0f - std::min(distance / 1.4142f, 1.0f); 
+                    window.at<cv::Vec3b>(neighbor_y, neighbor_x)[1] += 255 * weight;
+                }
+            }
+        }
+    }
 }
 
 int main() 
@@ -63,7 +98,7 @@ int main()
         if (control_points.size() == 4) 
         {
             naive_bezier(control_points, window);
-            //   bezier(control_points, window);
+            bezier(control_points, window);
 
             cv::imshow("Bezier Curve", window);
             cv::imwrite("my_bezier_curve.png", window);
