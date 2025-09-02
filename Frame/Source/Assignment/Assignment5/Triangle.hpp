@@ -20,8 +20,6 @@ bool rayTriangleIntersect(const Vector3f& v0,
     Vector3f edge2 = v2 - v0;
     Vector3f pvec =crossProduct(dir,edge2);
     float det = dotProduct(edge1, pvec);
-    //upper function:using this way to get »ìºÏ»ı
-
     //ensure the light coming from front place
     if (det > -eps && det < eps)
         return false;
